@@ -20,9 +20,15 @@ const isTrigger = EXECUTION_MODE === "trigger";
 
 export async function createSandbox(opts?: { timeout?: number }) {
   if (!isTrigger) return createSandboxLocal(opts);
-  const run = await createSandboxJob.invokeAndWaitForCompletion({
-    payload: {},
-  });
+
+  const run = await createSandboxJob.invokeAndWaitForCompletion(
+    {
+      payload: {},
+    },
+    undefined,
+    undefined
+  );
+
   return run.output?.sandboxId as string;
 }
 
@@ -39,15 +45,22 @@ export async function runCommand(args: {
       args: args.cmdArgs ?? [],
     });
   }
+
   // In trigger mode, we always wait for completion to return consistent data.
-  const run = await runCommandJob.invokeAndWaitForCompletion({
-    payload: {
-      sandboxId: args.sandboxId,
-      command: args.command,
-      args: args.cmdArgs ?? [],
+  const run = await runCommandJob.invokeAndWaitForCompletion(
+    {
+      payload: {
+        sandboxId: args.sandboxId,
+        command: args.command,
+        args: args.cmdArgs ?? [],
+      },
     },
-  });
+    undefined,
+    undefined
+  );
+
   const output = run.output ?? {};
+
   return {
     processId: (output as any).cmdId as string,
     exitCode: (output as any).exitCode as number | undefined,
@@ -66,6 +79,7 @@ export async function waitForCommandResult(args: {
       processId: args.processId,
     });
   }
+
   // In trigger mode, runCommand already waits; no-op.
   return {
     exitCode: undefined,
@@ -88,13 +102,19 @@ export async function writeFiles(args: {
     }
     return;
   }
-  await writeFilesJob.invokeAndWaitForCompletion({
-    payload: {
-      sandboxId: args.sandboxId,
-      files: args.files,
+
+  await writeFilesJob.invokeAndWaitForCompletion(
+    {
+      payload: {
+        sandboxId: args.sandboxId,
+        files: args.files,
+      },
     },
-  });
+    undefined,
+    undefined
+  );
 }
+
 export async function writeFile(args: {
   sandboxId: string;
   path: string;
@@ -115,9 +135,15 @@ export async function readFile(args: { sandboxId: string; path: string }) {
   if (!isTrigger) {
     return readFileLocal(args);
   }
-  const run = await readFileJob.invokeAndWaitForCompletion({
-    payload: args,
-  });
+
+  const run = await readFileJob.invokeAndWaitForCompletion(
+    {
+      payload: args,
+    },
+    undefined,
+    undefined
+  );
+
   return (run.output as any)?.content as string;
 }
 

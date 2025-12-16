@@ -8,6 +8,7 @@ import {
   getCommand as getCommandLocal,
   getSandboxUrl as getSandboxUrlLocal,
 } from "./e2b";
+
 import {
   createSandboxJob,
   runCommandJob,
@@ -18,26 +19,37 @@ import {
 const EXECUTION_MODE = process.env.EXECUTION_MODE ?? "local";
 const isTrigger = EXECUTION_MODE === "trigger";
 
-export async function createSandbox(opts?: { timeout?: number }) {
-  if (!isTrigger) return createSandboxLocal(opts);
-
-  const run = await createSandboxJob.invokeAndWaitForCompletion(
-    {
-      payload: {},
-    },
-    undefined,
-    undefined
-  );
-
-  return run.output?.sandboxId as string;
+// ----------------------------
+// Types
+// ----------------------------
+interface FilePayload {
+  path: string;
+  content: string;
 }
 
-export async function runCommand(args: {
+interface RunCommandArgs {
   sandboxId: string;
   command: string;
   cmdArgs?: string[];
   wait?: boolean;
-}) {
+}
+
+// ----------------------------
+// Sandbox Functions
+// ----------------------------
+export async function createSandbox(opts?: {
+  timeout?: number;
+}): Promise<string> {
+  if (!isTrigger) return createSandboxLocal(opts);
+
+  const run = await createSandboxJob.invokeAndWaitForCompletion({
+    payload: opts ?? {},
+  } as any); // cast to any to satisfy TS if needed
+
+  return run.output?.sandboxId as string;
+}
+
+export async function runCommand(args: RunCommandArgs) {
   if (!isTrigger) {
     return runCommandLocal({
       sandboxId: args.sandboxId,
@@ -46,18 +58,14 @@ export async function runCommand(args: {
     });
   }
 
-  // In trigger mode, we always wait for completion to return consistent data.
-  const run = await runCommandJob.invokeAndWaitForCompletion(
-    {
-      payload: {
-        sandboxId: args.sandboxId,
-        command: args.command,
-        args: args.cmdArgs ?? [],
-      },
+  // Trigger mode always waits
+  const run = await runCommandJob.invokeAndWaitForCompletion({
+    payload: {
+      sandboxId: args.sandboxId,
+      command: args.command,
+      args: args.cmdArgs ?? [],
     },
-    undefined,
-    undefined
-  );
+  } as any);
 
   const output = run.output ?? {};
 
@@ -90,29 +98,27 @@ export async function waitForCommandResult(args: {
 
 export async function writeFiles(args: {
   sandboxId: string;
-  files: { path: string; content: string }[];
+  files: FilePayload[];
 }) {
   if (!isTrigger) {
-    for (const file of args.files) {
-      await writeFileLocal({
-        sandboxId: args.sandboxId,
-        path: file.path,
-        content: file.content,
-      });
-    }
+    await Promise.all(
+      args.files.map((file) =>
+        writeFileLocal({
+          sandboxId: args.sandboxId,
+          path: file.path,
+          content: file.content,
+        })
+      )
+    );
     return;
   }
 
-  await writeFilesJob.invokeAndWaitForCompletion(
-    {
-      payload: {
-        sandboxId: args.sandboxId,
-        files: args.files,
-      },
+  await writeFilesJob.invokeAndWaitForCompletion({
+    payload: {
+      sandboxId: args.sandboxId,
+      files: args.files,
     },
-    undefined,
-    undefined
-  );
+  } as any);
 }
 
 export async function writeFile(args: {
@@ -122,31 +128,23 @@ export async function writeFile(args: {
 }) {
   return writeFiles({
     sandboxId: args.sandboxId,
-    files: [
-      {
-        path: args.path,
-        content: args.content,
-      },
-    ],
+    files: [{ path: args.path, content: args.content }],
   });
 }
 
 export async function readFile(args: { sandboxId: string; path: string }) {
-  if (!isTrigger) {
-    return readFileLocal(args);
-  }
+  if (!isTrigger) return readFileLocal(args);
 
-  const run = await readFileJob.invokeAndWaitForCompletion(
-    {
-      payload: args,
-    },
-    undefined,
-    undefined
-  );
+  const run = await readFileJob.invokeAndWaitForCompletion({
+    payload: args,
+  } as any);
 
   return (run.output as any)?.content as string;
 }
 
+// ----------------------------
+// Utility Functions
+// ----------------------------
 export function getCommandLogStream(args: {
   sandboxId: string;
   processId: string;

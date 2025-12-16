@@ -1,28 +1,27 @@
-import { NextResponse, type NextRequest } from 'next/server'
-import { Sandbox } from '@vercel/sandbox'
+import { NextResponse, type NextRequest } from "next/server";
+import { getCommand } from "@/lib/executor/provider";
 
 interface Params {
-  sandboxId: string
-  cmdId: string
+  sandboxId: string;
+  cmdId: string;
 }
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
-  const cmdParams = await params
-  const sandbox = await Sandbox.get(cmdParams)
-  const command = await sandbox.getCommand(cmdParams.cmdId)
-
-  /**
-   * The wait can get to fail when the Sandbox is stopped but the command
-   * was still running. In such case we return empty for finish data.
-   */
-  const done = await command.wait().catch(() => null)
+  const cmdParams = await params;
+  const command = await getCommand({
+    sandboxId: cmdParams.sandboxId,
+    processId: cmdParams.cmdId,
+  });
+  if (!command) {
+    return NextResponse.json({ error: "Command not found" }, { status: 404 });
+  }
   return NextResponse.json({
-    sandboxId: sandbox.sandboxId,
+    sandboxId: command.sandboxId,
     cmdId: command.cmdId,
     startedAt: command.startedAt,
-    exitCode: done?.exitCode,
-  })
+    exitCode: command.exitCode,
+  });
 }

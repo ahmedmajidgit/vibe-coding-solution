@@ -1,37 +1,39 @@
-import { NextResponse, type NextRequest } from 'next/server'
-import { Sandbox } from '@vercel/sandbox'
+import { NextResponse, type NextRequest } from "next/server";
+import { getCommandLogStream } from "@/lib/executor/provider";
 
 interface Params {
-  sandboxId: string
-  cmdId: string
+  sandboxId: string;
+  cmdId: string;
 }
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
-  const logParams = await params
-  const encoder = new TextEncoder()
-  const sandbox = await Sandbox.get(logParams)
-  const command = await sandbox.getCommand(logParams.cmdId)
+  const logParams = await params;
+  const encoder = new TextEncoder();
+  const logStream = await getCommandLogStream({
+    sandboxId: logParams.sandboxId,
+    processId: logParams.cmdId,
+  });
 
   return new NextResponse(
     new ReadableStream({
       async pull(controller) {
-        for await (const logline of command.logs()) {
+        for await (const logline of logStream) {
           controller.enqueue(
             encoder.encode(
               JSON.stringify({
                 data: logline.data,
                 stream: logline.stream,
-                timestamp: Date.now(),
-              }) + '\n'
+                timestamp: logline.timestamp,
+              }) + "\n"
             )
-          )
+          );
         }
-        controller.close()
+        controller.close();
       },
     }),
-    { headers: { 'Content-Type': 'application/x-ndjson' } }
-  )
+    { headers: { "Content-Type": "application/x-ndjson" } }
+  );
 }

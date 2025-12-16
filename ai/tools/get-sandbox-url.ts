@@ -31,7 +31,7 @@ export const getSandboxURL = ({ writer }: Params) =>
         data: { status: "loading" },
       });
 
-      const url = getSandboxUrl(sandboxId, port);
+      const url = getSandboxUrl(sandboxId, port) ?? undefined;
 
       writer.write({
         id: toolCallId,

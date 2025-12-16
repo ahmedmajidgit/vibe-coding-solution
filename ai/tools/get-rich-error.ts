@@ -1,7 +1,13 @@
 interface Params {
-  args?: Record<string, unknown>
-  action: string
-  error: unknown
+  args?: Record<string, unknown>;
+  action: string;
+  error: unknown;
+}
+
+interface ErrorFields {
+  message: string;
+  json?: unknown;
+  text?: string;
 }
 
 /**
@@ -9,27 +15,40 @@ interface Params {
  * message that can be handed to the LLM.
  */
 export function getRichError({ action, args, error }: Params) {
-  const fields = getErrorFields(error)
-  let message = `Error during ${action}: ${fields.message}`
-  if (args) message += `\nParameters: ${JSON.stringify(args, null, 2)}`
-  if (fields.json) message += `\nJSON: ${JSON.stringify(fields.json, null, 2)}`
-  if (fields.text) message += `\nText: ${fields.text}`
-  return {
-    message: message,
-    error: fields,
+  const fields: ErrorFields = getErrorFields(error);
+
+  let message = `Error during ${action}: ${fields.message}`;
+
+  if (args) {
+    message += `\nParameters: ${JSON.stringify(args, null, 2)}`;
   }
+
+  if (fields.json) {
+    message += `\nJSON: ${JSON.stringify(fields.json, null, 2)}`;
+  }
+
+  if (fields.text) {
+    message += `\nText: ${fields.text}`;
+  }
+
+  return {
+    message,
+    error: fields,
+  };
 }
 
-function getErrorFields(error: unknown) {
-  if (!(error instanceof Error)) {
-    return {
-      message: String(error),
-      json: error,
-    }
-  } else {
+function getErrorFields(error: unknown): ErrorFields {
+  if (error instanceof Error) {
     return {
       message: error.message,
       json: error,
-    }
+      text: error.stack,
+    };
   }
+
+  return {
+    message: String(error),
+    json: error,
+    text: typeof error === "string" ? error : undefined,
+  };
 }

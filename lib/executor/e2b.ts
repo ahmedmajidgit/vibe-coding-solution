@@ -248,6 +248,7 @@ export async function getCommandLogStream({
 }) {
   const stored = await getOrReconnectSandbox(sandboxId);
   const proc = stored.processes.get(processId);
+
   if (!proc) {
     async function* empty() {
       return;
@@ -255,9 +256,11 @@ export async function getCommandLogStream({
     return empty();
   }
 
+  const process = proc;
+
   async function* iterator() {
     // emit existing logs first
-    for (const log of proc.logs) {
+    for (const log of process.logs) {
       yield log;
     }
 
@@ -273,9 +276,9 @@ export async function getCommandLogStream({
       }
     };
 
-    proc.listeners.add(onLog);
+    process.listeners.add(onLog);
 
-    proc.donePromise.then(() => {
+    process.donePromise.then(() => {
       finished = true;
       if (resolveNext) {
         resolveNext();
@@ -295,7 +298,7 @@ export async function getCommandLogStream({
         });
       }
     } finally {
-      proc.listeners.delete(onLog);
+      process.listeners.delete(onLog);
     }
   }
 

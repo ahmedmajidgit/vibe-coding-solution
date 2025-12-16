@@ -107,36 +107,42 @@ export async function runCommand({
   const logs: CommandLog[] = [];
   let processId = "";
   let resolveDone: () => void = () => {};
+
   const donePromise = new Promise<void>((resolve) => {
     resolveDone = resolve;
   });
 
   const proc = await stored.sandbox.process.start({
     cmd: [command, ...args].join(" "),
-    onStdout: (msg) =>
+    onStdout: (msg) => {
       logs.push({
         data: msg.line,
         stream: "stdout",
         timestamp: Date.now(),
-      }),
-    onStderr: (msg) =>
+      });
+    },
+    onStderr: (msg) => {
       logs.push({
         data: msg.line,
         stream: "stderr",
         timestamp: Date.now(),
-      }),
+      });
+    },
     onExit: (exitCode) => {
       const storedProc = processId
         ? stored.processes.get(processId)
         : undefined;
+
       if (storedProc) {
         storedProc.exitCode = typeof exitCode === "number" ? exitCode : 0;
       }
+
       resolveDone();
     },
   });
 
   processId = proc.processID;
+
   stored.processes.set(processId, {
     processId,
     command,

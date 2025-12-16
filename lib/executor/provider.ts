@@ -42,9 +42,11 @@ export async function createSandbox(opts?: {
 }): Promise<string> {
   if (!isTrigger) return createSandboxLocal(opts);
 
-  const run = await createSandboxJob.invokeAndWaitForCompletion({
-    payload: opts ?? {},
-  } as any); // cast to any to satisfy TS if needed
+  const run = await createSandboxJob.invokeAndWaitForCompletion(
+    { payload: opts ?? {} }, // input
+    undefined, // options
+    undefined // waitForCompletionOptions
+  );
 
   return run.output?.sandboxId as string;
 }
@@ -58,14 +60,17 @@ export async function runCommand(args: RunCommandArgs) {
     });
   }
 
-  // Trigger mode always waits
-  const run = await runCommandJob.invokeAndWaitForCompletion({
-    payload: {
-      sandboxId: args.sandboxId,
-      command: args.command,
-      args: args.cmdArgs ?? [],
+  const run = await runCommandJob.invokeAndWaitForCompletion(
+    {
+      payload: {
+        sandboxId: args.sandboxId,
+        command: args.command,
+        args: args.cmdArgs ?? [],
+      },
     },
-  } as any);
+    undefined,
+    undefined
+  );
 
   const output = run.output ?? {};
 
@@ -113,12 +118,16 @@ export async function writeFiles(args: {
     return;
   }
 
-  await writeFilesJob.invokeAndWaitForCompletion({
-    payload: {
-      sandboxId: args.sandboxId,
-      files: args.files,
+  await writeFilesJob.invokeAndWaitForCompletion(
+    {
+      payload: {
+        sandboxId: args.sandboxId,
+        files: args.files,
+      },
     },
-  } as any);
+    undefined,
+    undefined
+  );
 }
 
 export async function writeFile(args: {
@@ -135,9 +144,11 @@ export async function writeFile(args: {
 export async function readFile(args: { sandboxId: string; path: string }) {
   if (!isTrigger) return readFileLocal(args);
 
-  const run = await readFileJob.invokeAndWaitForCompletion({
-    payload: args,
-  } as any);
+  const run = await readFileJob.invokeAndWaitForCompletion(
+    { payload: args },
+    undefined,
+    undefined
+  );
 
   return (run.output as any)?.content as string;
 }

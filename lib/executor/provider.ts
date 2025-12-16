@@ -43,12 +43,18 @@ export async function createSandbox(opts?: {
   if (!isTrigger) return createSandboxLocal(opts);
 
   const run = await createSandboxJob.invokeAndWaitForCompletion(
-    { payload: opts ?? {} }, // input
-    undefined, // options
-    undefined // waitForCompletionOptions
+    "create-sandbox", // cacheKey
+    opts ?? {}, // payload
+    undefined, // timeoutInSeconds
+    undefined // options
   );
+  // Check if the run succeeded
+  if ("output" in run) {
+    return run.output.sandboxId;
+  }
 
-  return run.output?.sandboxId as string;
+  // Failed run
+  throw new Error(`Sandbox creation failed: ${JSON.stringify(run)}`);
 }
 
 export async function runCommand(args: RunCommandArgs) {
@@ -61,24 +67,28 @@ export async function runCommand(args: RunCommandArgs) {
   }
 
   const run = await runCommandJob.invokeAndWaitForCompletion(
+    "run-command", // cacheKey
     {
-      payload: {
-        sandboxId: args.sandboxId,
-        command: args.command,
-        args: args.cmdArgs ?? [],
-      },
+      sandboxId: args.sandboxId,
+      command: args.command,
+      args: args.cmdArgs ?? [],
     },
     undefined,
     undefined
   );
 
-  const output = run.output ?? {};
+  // Narrow type: only proceed if 'output' exists
+  if (!("output" in run)) {
+    throw new Error(`Command failed: ${JSON.stringify(run)}`);
+  }
+
+  const output = run.output;
 
   return {
-    processId: (output as any).cmdId as string,
-    exitCode: (output as any).exitCode as number | undefined,
-    stdout: (output as any).stdout as string | undefined,
-    stderr: (output as any).stderr as string | undefined,
+    processId: output.cmdId,
+    exitCode: output.exitCode,
+    stdout: output.stdout,
+    stderr: output.stderr,
   };
 }
 
@@ -119,11 +129,10 @@ export async function writeFiles(args: {
   }
 
   await writeFilesJob.invokeAndWaitForCompletion(
+    "write-files", // cacheKey
     {
-      payload: {
-        sandboxId: args.sandboxId,
-        files: args.files,
-      },
+      sandboxId: args.sandboxId,
+      files: args.files,
     },
     undefined,
     undefined
@@ -145,12 +154,18 @@ export async function readFile(args: { sandboxId: string; path: string }) {
   if (!isTrigger) return readFileLocal(args);
 
   const run = await readFileJob.invokeAndWaitForCompletion(
-    { payload: args },
+    "read-file", // cacheKey
+    args,
     undefined,
     undefined
   );
 
-  return (run.output as any)?.content as string;
+  // Narrow type to check if the job succeeded
+  if (!("output" in run)) {
+    throw new Error(`Failed to read file: ${JSON.stringify(run)}`);
+  }
+
+  return run.output.content;
 }
 
 // ----------------------------
